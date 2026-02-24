@@ -53,6 +53,6 @@ night --no-caffeinate
 
 - `night` is macOS-only.
 - The CLI uses a bundled Swift helper (`native/macos_brightness.swift`) to read/write:
-  - display brightness via `AppleARMBacklight` (IOKit)
+  - display brightness via active-display APIs (`DisplayServices`) with `AppleARMBacklight` fallback
   - keyboard brightness via `KeyboardBrightnessClient` (CoreBrightness)
 - `Ctrl-C` also restores state before exit.

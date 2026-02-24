@@ -176,8 +176,39 @@ async function runHelper(args) {
   }
 }
 
-async function getDisplayBrightness() {
-  return parseUnitValue(await runHelper(["display-get"]), "display brightness");
+function parseDisplaySnapshot(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Could not parse display snapshot JSON: ${error.message}`);
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("Display snapshot is empty.");
+  }
+
+  const entries = [];
+  for (const item of parsed) {
+    const id = String(item?.id ?? "").trim();
+    if (id.length === 0) {
+      throw new Error("Display snapshot contains entry with missing id.");
+    }
+    const value = parseUnitValue(item?.value, `display brightness for ${id}`);
+    entries.push({ id, value });
+  }
+  return entries;
+}
+
+async function getDisplaySnapshot() {
+  return parseDisplaySnapshot(await runHelper(["display-all-get"]));
+}
+
+async function setAllDisplaysBrightness(value) {
+  await runHelper(["display-all-set", formatUnitValue(value)]);
+}
+
+async function setDisplayBrightnessById(id, value) {
+  await runHelper(["display-one-set", id, formatUnitValue(value)]);
 }
 
 async function setDisplayBrightness(value) {
@@ -369,7 +400,7 @@ async function executeNight(config) {
   }
 
   const state = {
-    displayBefore: null,
+    displayBefore: [],
     displayDimmed: false,
     keyboardBefore: null,
     keyboardDimmed: false,
@@ -379,9 +410,10 @@ async function executeNight(config) {
 
   let caffeinate = null;
   let wake = { reason: "unknown" };
+  let displayPinTimer = null;
 
   if (!config.noDisplay) {
-    state.displayBefore = await getDisplayBrightness();
+    state.displayBefore = await getDisplaySnapshot();
   }
   if (!config.noKeyboard) {
     state.keyboardBefore = await getKeyboardBrightness();
@@ -404,8 +436,23 @@ async function executeNight(config) {
     }
 
     if (!config.noDisplay) {
-      await setDisplayBrightness(0);
+      await setAllDisplaysBrightness(0);
       state.displayDimmed = true;
+      let displayPinInFlight = false;
+      displayPinTimer = setInterval(() => {
+        if (displayPinInFlight) {
+          return;
+        }
+        displayPinInFlight = true;
+        setAllDisplaysBrightness(0)
+          .catch(() => {
+            // best-effort pinning while waiting
+          })
+          .finally(() => {
+            displayPinInFlight = false;
+          });
+      }, 2000);
+      displayPinTimer.unref();
     }
 
     console.log("Night mode active. Press any key to restore and exit.");
@@ -413,9 +460,16 @@ async function executeNight(config) {
   } finally {
     const restoreErrors = [];
 
-    if (state.displayDimmed && state.displayBefore !== null) {
+    if (displayPinTimer) {
+      clearInterval(displayPinTimer);
+      displayPinTimer = null;
+    }
+
+    if (state.displayDimmed && state.displayBefore.length > 0) {
       try {
-        await setDisplayBrightness(state.displayBefore);
+        for (const entry of state.displayBefore) {
+          await setDisplayBrightnessById(entry.id, entry.value);
+        }
       } catch (error) {
         restoreErrors.push(`display restore failed: ${error.message}`);
       }
