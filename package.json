@@ -1,0 +1,35 @@
+{
+  "name": "@funtusov/night",
+  "version": "0.1.0",
+  "description": "macOS night mode CLI: keep awake, dim display + keyboard, restore on key press",
+  "type": "module",
+  "bin": {
+    "night": "bin/night.mjs"
+  },
+  "files": [
+    "bin",
+    "native",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "lint": "node --check bin/night.mjs",
+    "start": "node bin/night.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/funtusov/night.git"
+  },
+  "keywords": [
+    "macos",
+    "caffeinate",
+    "brightness",
+    "keyboard",
+    "cli"
+  ],
+  "author": "Greg Funtusov",
+  "license": "MIT"
+}
